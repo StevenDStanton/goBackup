@@ -1,0 +1,52 @@
+# Compiled Object files, Static and Dynamic libs (Shared Objects)
+*.o
+*.a
+*.so
+
+# Folders
+/_obj
+/_test
+
+# Architecture specific extensions/prefixes
+*.[568vq]
+[568vq].out
+
+# Binary executable files
+*.exe
+*.dll
+*.so
+*.dylib
+*.bin
+*.out
+*.test
+
+# Output of the Go coverage tool
+*.cover
+
+# Dependency directories (remove the comment below if you want to check in your vendor directory)
+# /vendor/
+
+# Editor files
+.vscode/
+
+# Log files
+*.log
+
+# Local development files
+.env
+.env.local
+
+# Node.js
+# Comment out if you're not using Node or tools like Browsersync
+node_modules/
+
+# Output directories
+/bin/
+/pkg/
+
+# Go specific files
+go.mod
+go.sum
+
+# Ignore the binary built by the Go toolchain
+fileMonitor

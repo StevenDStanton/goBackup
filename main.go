@@ -1,98 +1,171 @@
 package main
 
 import (
+	"crypto/sha256"
 	"database/sql"
-	"fmt"
+	"encoding/hex"
+	"io"
 	"os"
-	"time"
+	"path/filepath"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/fsnotify/fsnotify"
 	"github.com/joho/godotenv"
+	"github.com/sirupsen/logrus"
 	_ "modernc.org/sqlite"
 )
 
-func main() {
-	err := godotenv.Load()
+type App struct {
+	db      *sql.DB
+	watcher *fsnotify.Watcher
+	logger  *logrus.Logger
+	config  Config
+}
+
+type Config struct {
+	LocalFilePath string
+	DatabasePath  string
+}
+
+func NewApp() *App {
+	logger := logrus.New()
+	config := loadConfig()
+	db := setupDatabase(config, logger)
+	watcher := setupWatcher(config.LocalFilePath, logger)
+
+	return &App{
+		db:      db,
+		watcher: watcher,
+		logger:  logger,
+		config:  config,
+	}
+}
+
+func loadConfig() Config {
+	if err := godotenv.Load(); err != nil {
+		logrus.Fatalf("Error loading .env file: %v", err)
+	}
+	return Config{
+		LocalFilePath: os.Getenv("LOCAL_FILE_PATH"),
+		DatabasePath:  "filehashes.db",
+	}
+}
+
+func setupDatabase(config Config, logger *logrus.Logger) *sql.DB {
+	db, err := sql.Open("sqlite", config.DatabasePath)
 	if err != nil {
-		fmt.Println("Error loading .env file:", err)
-		return
+		logger.Fatalf("Error opening database connection: %v", err)
 	}
 
-	fmt.Println("File Monitoring Service Starting...")
-
-	// Initialize AWS Session
-	awsConfig := &aws.Config{
-		Region: aws.String(os.Getenv("AWS_REGION")),
-		Credentials: credentials.NewStaticCredentials(
-			os.Getenv("AWS_ACCESS_KEY_ID"),
-			os.Getenv("AWS_SECRET_ACCESS_KEY"),
-			"",
-		),
-	}
-	sess := session.Must(session.NewSession(awsConfig))
-	s3Client := s3.New(sess)
-
-	// Setup local Database
-	db, err := sql.Open("sqlite", "filehashes.db")
-	if err != nil {
-		fmt.Println("Error opening database connection:", err)
-		return
-	}
-	defer db.Close()
-
-	// Create the database table
-	_, err = db.Exec(`CREATE TABLE IF NOT EXISTS filehashes (
+	createFilehashesTable := `
+    CREATE TABLE IF NOT EXISTS filehashes (
         Path TEXT PRIMARY KEY,
         Hash TEXT,
         Uploaded BOOLEAN
-    );`)
-	if err != nil {
-		fmt.Println("Error creating table:", err)
-		return
+    );`
+	if _, err = db.Exec(createFilehashesTable); err != nil {
+		db.Close()
+		logger.Fatalf("Unable to create filehashes table: %v", err)
 	}
 
-	// File system watcher setup for specified path
+	createRetryFilesTable := `
+    CREATE TABLE IF NOT EXISTS retry_files (
+        Path TEXT PRIMARY KEY
+    );`
+	if _, err = db.Exec(createRetryFilesTable); err != nil {
+		db.Close()
+		logger.Fatalf("Unable to create retry_files table: %v", err)
+	}
+
+	return db
+}
+
+func setupWatcher(pathToWatch string, logger *logrus.Logger) *fsnotify.Watcher {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		fmt.Println("Error creating watcher:", err)
-		return
-	}
-	defer watcher.Close()
-
-	// Add path to watcher
-	err = watcher.Add(os.Getenv("LOCAL_FILE_PATH"))
-	if err != nil {
-		fmt.Println("Error adding path to watcher:", err)
-		return
+		logger.Fatalf("Error creating watcher: %v", err)
 	}
 
-	// Timer to upload every 15 minutes
-	timer := time.NewTicker(15 * time.Minute)
-	defer timer.Stop()
+	if err := watcher.Add(pathToWatch); err != nil {
+		logger.Fatalf("Error adding path to watcher: %v", err)
+	}
 
-	// Event handling loop
+	return watcher
+}
+
+func (app *App) Run() {
+	defer app.db.Close()
+	defer app.watcher.Close()
+
+	app.initializeFileHashes()
+
+	app.logger.Info("Starting to watch for file events...")
 	for {
 		select {
-		case event := <-watcher.Events:
-			go handleFileEvent(event, db)
-		case <-timer.C:
-			go handleUploads(db, s3Client)
-		case err := <-watcher.Errors:
-			fmt.Println("Watcher error:", err)
+		case event := <-app.watcher.Events:
+			go app.handleFileEvent(event)
+		case err := <-app.watcher.Errors:
+			app.logger.Errorf("Error watching directory: %v", err)
 		}
 	}
 }
 
-func handleFileEvent(event fsnotify.Event, db *sql.DB) {
-	fmt.Println("Detected file change:", event.Name)
-	// Implement logic to update DB and handle file change
+func (app *App) handleFileEvent(event fsnotify.Event) {
+	app.logger.Infof("Detected file change: %s", event.Name)
+	// Add your specific handling logic here, e.g., rehash the file
 }
 
-func handleUploads(db *sql.DB, s3Client *s3.S3) {
-	fmt.Println("Handling scheduled uploads...")
-	// Implement upload logic
+func (app *App) initializeFileHashes() {
+	err := filepath.Walk(app.config.LocalFilePath, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		return app.addFileToDB(path)
+	})
+	if err != nil {
+		app.logger.Error("Error walking the directory:", err)
+	}
+}
+
+func (app *App) addFileToDB(path string) error {
+	newHash, err := app.computeFileHash(path)
+	if err != nil {
+		return err
+	}
+
+	var dbHash string
+	err = app.db.QueryRow("SELECT Hash FROM filehashes WHERE Path = ?", path).Scan(&dbHash)
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
+	if err == sql.ErrNoRows || dbHash != newHash {
+		_, err = app.db.Exec("REPLACE INTO filehashes (Path, Hash, Uploaded) VALUES (?, ?, FALSE)", path, newHash)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (app *App) computeFileHash(path string) (string, error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return "", err
+	}
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func main() {
+	app := NewApp()
+	app.Run()
 }

@@ -19,24 +19,24 @@ This system monitors specified directories for file changes, logs these events, 
 
 ### Setup and Initial Configuration
 
-- [ ] Set up a Go project environment.
-- [ ] Install necessary Go packages (`fsnotify`, `aws-sdk-go`, etc.).
-- [ ] Create an initial project structure (directories for models, controllers, utilities).
+- [x] Set up a Go project environment.
+- [x] Install necessary Go packages (`fsnotify`, `aws-sdk-go`, etc.).
+- [x] Create an initial project structure.
 
 ### Database Design
 
-- [ ] Design and set up an SQLite database schema for storing file hashes and configurations.
-- [ ] Implement database interaction utilities (connect, read, write).
+- [x] Design and set up an SQLite database schema for storing file hashes and configurations.
+- [x] Implement database interaction utilities (connect, read, write).
 
 ### File Monitoring
 
-- [ ] Implement file monitoring using `fsnotify`.
+- [x] Implement file monitoring using `fsnotify`.
 - [ ] Develop logic to calculate and compare file hashes.
 - [ ] Store and retrieve file hashes from the SQLite database.
 
 ### AWS Integration
 
-- [ ] Set up AWS CLI and ensure it's configured on the development machine.
+- [x] Set up AWS CLI and ensure it's configured on the development machine.
 - [ ] Implement file upload functionality using AWS SDK for Go.
 - [ ] Ensure encryption is enabled for file uploads.
 

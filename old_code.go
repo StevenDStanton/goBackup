@@ -1,5 +1,3 @@
-// package main
-
 // func main() {
 
 // 	// Initialize AWS Session
@@ -13,21 +11,6 @@
 // 	}
 // 	sess := session.Must(session.NewSession(awsConfig))
 // 	s3Client := s3.New(sess)
-
-// 	// File system watcher setup for specified path
-// 	watcher, err := fsnotify.NewWatcher()
-// 	if err != nil {
-// 		fmt.Println("Error creating watcher:", err)
-// 		return
-// 	}
-// 	defer watcher.Close()
-
-// 	// Add path to watcher
-// 	err = setupWatcher(watcher, os.Getenv("LOCAL_FILE_PATH"))
-// 	if err != nil {
-// 		fmt.Println("Error adding path to watcher:", err)
-// 		return
-// 	}
 
 // 	// Timer to upload every 15 minutes
 // 	timer := time.NewTicker(15 * time.Minute)

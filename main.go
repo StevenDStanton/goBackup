@@ -24,11 +24,18 @@ func init() {
 func main() {
 	fd, err := initInotifyWatches()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Error 1: %v", err)
 	}
 	defer unix.Close(fd)
 
-	buf := make([]byte, unix.SizeofInotifyEvent*4096)
+	buffer := make([]byte, unix.SizeofInotifyEvent*4096)
+
+	for {
+		n, err := unix.Read(fd, buffer)
+		if err != nil {
+			log.Fatalf("Error 2: %v", err)
+		}
+	}
 
 }
 

@@ -6,6 +6,12 @@ As Chrome moved to manifest version 3 and adblock became less effective I starte
 
 This system monitors specified directories for file changes, logs these events, and synchronizes changed files to an AWS S3 bucket. It uses an SQLite database to store file hashes and configuration settings, ensuring data integrity and enabling recovery in case of system failures.
 
+## Interesting side-note and a move to only support Linux
+
+Since I first started this project I have switched from Windows to Linux. I was not happy with how Windows was performing for this application since it was not detecting file updates in real time. I am not sure if this was due to the iNotify library I was using or if it was due to the Windows API's being weird, however, at the time I read about other people having the same sort of issues.
+
+Since moving to linux I have circled back to this project. I would still like to have my writing backed up automatically to an S3 bucket. So I am making it work for linux only and using the unix package.
+
 ## Features
 
 - Real-time file monitoring.
@@ -17,63 +23,8 @@ This system monitors specified directories for file changes, logs these events, 
 
 ## Development Checklist
 
-### Setup and Initial Configuration
-
-- [x] Set up a Go project environment.
-- [x] Install necessary Go packages (`fsnotify`, `aws-sdk-go`, etc.).
-- [x] Create an initial project structure.
-
-### Database Design
-
-- [x] Design and set up an SQLite database schema for storing file hashes and configurations.
-- [x] Implement database interaction utilities (connect, read, write).
-
-### File Monitoring
-
-- [x] Implement file monitoring using `fsnotify`.
-- [ ] Develop logic to calculate and compare file hashes.
-- [ ] Store and retrieve file hashes from the SQLite database.
-
-### AWS Integration
-
-- [x] Set up AWS CLI and ensure it's configured on the development machine.
-- [ ] Implement file upload functionality using AWS SDK for Go.
-- [ ] Ensure encryption is enabled for file uploads.
-
-### User Interface
-
-- [ ] Design a basic UI layout using a suitable Go library or framework.
-- [ ] Implement system tray integration for minimization and background running.
-- [ ] Develop configuration management sections in the UI.
-
-### Backup and Recovery
-
-- [ ] Implement automatic backup of the SQLite database to S3.
-- [ ] Develop a recovery process to restore the SQLite database and files from S3.
-- [ ] Allow the user to specify a local folder for recovery downloads.
-
-### Notifications and Logging
-
-- [ ] Set up a logging system to track file changes and system errors.
-- [ ] Implement user notifications for critical events and statuses.
-
-### Security and Performance
-
-- [ ] Ensure secure storage of sensitive configuration data.
-- [ ] Optimize performance for handling large numbers of files or very large files.
-
-### Testing and Deployment
-
-- [ ] Thoroughly test file monitoring, backup, and recovery functionalities.
-- [ ] Test UI interactions and configuration management.
-- [ ] Prepare deployment guidelines and scripts.
-
-### Documentation
-
-- [ ] Write comprehensive user documentation covering setup, use, and troubleshooting.
-- [ ] Document the code and API endpoints (if any).
-
-## Future Enhancements
-
-- [ ] Consider adding support for monitoring multiple directories.
-- [ ] Explore the integration of additional cloud storage providers.
+- [ ] Set up File Monitoring
+- [ ] Scan existing files for Hash
+- [ ] Save hash to SQLite DB
+- [ ] When restarting scan files for changes since last run
+- [ ] Look into some way to check file integrity after upload?
